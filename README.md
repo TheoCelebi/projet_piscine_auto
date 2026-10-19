@@ -28,6 +28,17 @@ cp config.example.yaml config.yaml  # puis adapte les règles
 - **Mémoire** (`etat.json`, local) : ce que le bot a réservé. Si une séance réservée par le bot disparaît de « Mes réservations », c'est que tu l'as annulée : le bot ne la reprendra jamais.
 - Les séances que tu réserves toi-même sont reconnues et ignorées.
 
+## Exécution automatique (GitHub Actions)
+
+Le workflow `reservation.yml` tourne chaque jour vers 8h40 (heure de Paris), attend les ouvertures de 9h15 et réserve, puis s'arrête : rien ne tourne chez soi.
+
+Secrets à définir dans le dépôt (Settings → Secrets and variables → Actions) :
+
+- `HEITZFIT_EMAIL`, `HEITZFIT_PASSWORD` : identifiants HeitzFit
+- `HEITZFIT_CONFIG` : contenu de `config.yaml` (gardé secret pour ne pas publier ses horaires)
+
+Les logs étant publics, le bot y masque le détail des séances. La mémoire (`etat.json`) est conservée d'un passage à l'autre dans le cache GitHub Actions. En cas d'échec, GitHub envoie un email.
+
 Le bot appelle directement l'API de app.heitzfit.com (centre 1879, Bois-Colombes).
 
 ## Sécurité

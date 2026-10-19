@@ -1,0 +1,72 @@
+name: Réservation piscine
+
+on:
+  schedule:
+    # Les ouvertures tombent à 9h15 heure de Paris. GitHub peut démarrer avec du retard,
+    # donc on lance vers 8h40 et le bot attend l'heure exacte.
+    # Deux horaires UTC pour couvrir l'heure d'été (UTC+2) et l'heure d'hiver (UTC+1).
+    - cron: "40 6 * * *"
+    - cron: "40 7 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: reservation
+  cancel-in-progress: false
+
+jobs:
+  reserver:
+    runs-on: ubuntu-latest
+    timeout-minutes: 100
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+
+      - run: pip install -r requirements.txt
+
+      - name: Restaurer la mémoire du bot
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: etat.json
+          key: etat-${{ github.run_id }}
+          restore-keys: etat-
+
+      - name: Écrire la configuration (secret, pour ne pas publier tes horaires)
+        env:
+          HEITZFIT_CONFIG: ${{ secrets.HEITZFIT_CONFIG }}
+        run: |
+          printf '%s\n' "$HEITZFIT_CONFIG" > config.yaml
+          [ -f etat.json ] || echo '{}' > etat.json
+
+      - name: Réserver
+        env:
+          HEITZFIT_EMAIL: ${{ secrets.HEITZFIT_EMAIL }}
+          HEITZFIT_PASSWORD: ${{ secrets.HEITZFIT_PASSWORD }}
+          PISCINE_BOT_DISCRET: "1"
+          TZ: Europe/Paris
+        run: python -m piscine_bot --fenetre 60
+
+      - name: Sauvegarder la mémoire du bot
+        if: always()
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: etat.json
+          key: etat-${{ github.run_id }}
+
+  # GitHub met en pause les tâches planifiées après 60 jours sans activité sur le dépôt.
+  # Réactiver le workflow à chaque passage remet ce compteur à zéro.
+  rester-actif:
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+    steps:
+      - env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/reservation.yml/enable"

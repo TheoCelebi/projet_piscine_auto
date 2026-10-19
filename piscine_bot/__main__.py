@@ -3,6 +3,7 @@
     python -m piscine_bot                  # simulation : affiche ce qui serait réservé
     python -m piscine_bot --reserver       # un passage : réserve ce qui est ouvert
     python -m piscine_bot --surveiller     # tourne en continu et réserve dès l'ouverture
+    python -m piscine_bot --fenetre 60     # un passage : réserve ce qui ouvre dans l'heure, puis s'arrête
     python -m piscine_bot --planning 2026-10-21   # affiche le planning d'un jour
 """
 
@@ -25,6 +26,8 @@ AVANCE_CONNEXION_S = 60  # connexion 1 min avant l'ouverture
 RETENTE_MAX_S = 180  # on réessaie pendant 3 min si HeitzFit n'a pas encore ouvert
 # Codes HeitzFit renvoyés quand la séance est hors de la période de réservation.
 PAS_ENCORE_OUVERT = {"PERIOD_EXCEEDED", "PERIOD_NOT_STARTED"}
+# Sur GitHub Actions (dépôt public, logs visibles par tous), on ne dévoile pas tes horaires.
+DISCRET = os.getenv("PISCINE_BOT_DISCRET") == "1"
 
 
 def log(msg):
@@ -56,6 +59,8 @@ def correspond(seance, regle):
 
 
 def afficher(s):
+    if DISCRET:
+        return "séance (détails masqués : les logs GitHub Actions sont publics)"
     return (f"{JOURS[s['debut'].weekday()][:3]} {s['debut']:%d/%m %H:%M}  {s['activity']:<12} "
             f"{s['room']:<20} {s['placesTaken']}/{s['placesMax']}  (id {s['id']})")
 
@@ -70,12 +75,13 @@ class Bot:
         self.exclues = {int(i) for i in config.get("exclure_ids", [])}
         self.connecte_a = None
         self.sur_compte = set()  # séances déjà réservées sur le compte (par le bot ou par toi)
+        self.echecs = 0
 
     def connexion(self):
         load_dotenv()
         email, mdp = os.getenv("HEITZFIT_EMAIL"), os.getenv("HEITZFIT_PASSWORD")
         if not email or not mdp:
-            raise SystemExit("HEITZFIT_EMAIL / HEITZFIT_PASSWORD manquants dans .env")
+            raise SystemExit("HEITZFIT_EMAIL / HEITZFIT_PASSWORD manquants (.env ou secrets GitHub)")
         self.hf.connexion(email, mdp)
         self.connecte_a = time.monotonic()
 
@@ -93,7 +99,8 @@ class Bot:
         if not self.config.get("detecter_annulations", False):
             return
         for s in self.etat.synchroniser(self.sur_compte):
-            log(f"ANNULÉE PAR TOI (ne sera plus réservée) : {s['activite']} {s['debut'][:16]}")
+            detail = "séance" if DISCRET else f"{s['activite']} {s['debut'][:16]}"
+            log(f"ANNULÉE PAR TOI (ne sera plus réservée) : {detail}")
 
     def passage(self):
         """Réserve tout ce qui est ouvert. Renvoie les séances qui ouvriront plus tard."""
@@ -129,9 +136,27 @@ class Bot:
                 self.etat.marquer(s, RESERVEE)
                 log(f"RÉSERVÉ : {afficher(s)}")
             else:
+                self.echecs += 1
                 log(f"ÉCHEC   : {afficher(s)} -> toujours fermé après {RETENTE_MAX_S}s")
         except HeitzfitError as e:
+            self.echecs += 1
             log(f"ÉCHEC   : {afficher(s)} -> {e.code or e}")
+
+    def passage_unique(self, fenetre_min):
+        """Réserve ce qui est ouvert, puis attend les ouvertures des `fenetre_min` prochaines minutes."""
+        self.connexion()
+        self.synchroniser()
+        limite = datetime.now(PARIS) + timedelta(minutes=fenetre_min)
+        a_venir = sorted((x for x in self.passage() if x[0] <= limite), key=lambda x: x[0])
+        if not a_venir:
+            log(f"Aucune ouverture dans les {fenetre_min} prochaines minutes.")
+        for ouverture, s in a_venir:
+            log(f"Ouverture à {ouverture:%H:%M:%S} : en attente.")
+            time.sleep(max(0, (ouverture - datetime.now(PARIS)).total_seconds() - AVANCE_CONNEXION_S))
+            self.connexion()  # session fraîche juste avant l'ouverture
+            self.tenter(s, ouverture)
+        log(f"Terminé : {self.echecs} échec(s).")
+        return 1 if self.echecs else 0
 
     def reserver_des_ouverture(self, seance, ouverture):
         """Réserve, en réessayant chaque seconde tant que HeitzFit dit que ce n'est pas encore ouvert."""
@@ -185,6 +210,8 @@ def main():
     parser.add_argument("--etat", default="etat.json", help="fichier mémoire du bot")
     parser.add_argument("--reserver", action="store_true", help="un passage, réservations réelles")
     parser.add_argument("--surveiller", action="store_true", help="tourne en continu, réservations réelles")
+    parser.add_argument("--fenetre", type=int, metavar="MIN",
+                        help="un passage réel qui attend aussi les ouvertures des MIN prochaines minutes, puis s'arrête")
     parser.add_argument("--planning", metavar="AAAA-MM-JJ", help="afficher le planning d'un jour et quitter")
     args = parser.parse_args()
 
@@ -196,7 +223,9 @@ def main():
             print(afficher(s))
         return 0
 
-    bot = Bot(config, Etat(args.etat), reel=args.reserver or args.surveiller)
+    bot = Bot(config, Etat(args.etat), reel=args.reserver or args.surveiller or args.fenetre is not None)
+    if args.fenetre is not None:
+        return bot.passage_unique(args.fenetre)
     if args.surveiller:
         bot.surveiller()
     if args.reserver:
