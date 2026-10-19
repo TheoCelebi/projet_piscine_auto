@@ -1,6 +1,7 @@
 # Copie ce fichier en config.yaml (ignoré par git) et liste tes séances.
 
 centre: 1879  # Centre Aquatique de BOIS COLOMBES
+ouverture_heures_avant: 48  # les réservations ouvrent 48h avant le début de la séance
 
 seances:
   # Une séance précise, à une date donnée

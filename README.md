@@ -15,7 +15,8 @@ cp config.example.yaml config.yaml  # puis liste tes séances
 
 ```bash
 .venv/bin/python -m piscine_bot                        # simulation : affiche ce qui serait réservé
-.venv/bin/python -m piscine_bot --reserver             # réserve pour de vrai
+.venv/bin/python -m piscine_bot --reserver             # réserve ce qui est déjà ouvert
+.venv/bin/python -m piscine_bot --reserver --attendre  # attend l'ouverture (48h avant) puis réserve
 .venv/bin/python -m piscine_bot --planning 2026-10-21  # planning d'un jour
 ```
 
