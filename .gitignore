@@ -1,0 +1,46 @@
+# --- Secrets : ne JAMAIS versionner ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+credentials*.json
+
+# --- Données de session navigateur (cookies, tokens de connexion) ---
+storage_state*.json
+auth/
+.auth/
+playwright/.auth/
+
+# --- Configuration personnelle (tes séances, ton profil) ---
+config.yaml
+config.local.*
+!config.example.yaml
+
+# --- Logs, captures, traces (peuvent contenir des données perso) ---
+logs/
+*.log
+screenshots/
+traces/
+test-results/
+playwright-report/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+dist/
+build/
+*.egg-info/
+
+# --- OS / éditeurs ---
+.DS_Store
+Thumbs.db
+desktop.ini
+.vscode/
+.idea/
