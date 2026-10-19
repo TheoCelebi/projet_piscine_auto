@@ -2,11 +2,11 @@ name: Réservation piscine
 
 on:
   schedule:
-    # Les ouvertures tombent à 9h15 heure de Paris. GitHub peut démarrer avec du retard,
-    # donc on lance vers 8h40 et le bot attend l'heure exacte.
-    # Deux horaires UTC pour couvrir l'heure d'été (UTC+2) et l'heure d'hiver (UTC+1).
-    - cron: "40 6 * * *"
-    - cron: "40 7 * * *"
+    # Les ouvertures visées tombent à 9h15 et 11h15 heure de Paris. GitHub peut démarrer
+    # avec du retard, donc on lance ~35 min avant et le bot attend l'heure exacte.
+    # Passages à 6h40, 7h40, 8h40 et 9h40 UTC : couvre 9h15 et 11h15 en heure d'été (UTC+2)
+    # comme en heure d'hiver (UTC+1). Chaque passage gère les ouvertures de l'heure qui suit.
+    - cron: "40 6-9 * * *"
   workflow_dispatch:
 
 permissions:

@@ -30,7 +30,7 @@ cp config.example.yaml config.yaml  # puis adapte les règles
 
 ## Exécution automatique (GitHub Actions)
 
-Le workflow `reservation.yml` tourne chaque jour vers 8h40 (heure de Paris), attend les ouvertures de 9h15 et réserve, puis s'arrête : rien ne tourne chez soi.
+Le workflow `reservation.yml` tourne chaque matin (passages horaires de 8h40 à 11h40, heure de Paris), attend les ouvertures visées (9h15, 11h15) et réserve, puis s’arrête : rien ne tourne chez soi.
 
 Secrets à définir dans le dépôt (Settings → Secrets and variables → Actions) :
 
