@@ -37,7 +37,7 @@ def correspond(seance, voulue):
 
 
 def afficher(s):
-    return (f"{JOURS[s['debut'].weekday()][:3]} {s['debut']:%d/%m %H:%M}{s['activity']:<12} {s['room']:<20} "
+    return (f"{JOURS[s['debut'].weekday()][:3]} {s['debut']:%d/%m %H:%M}  {s['activity']:<12} {s['room']:<20} "
             f"{s['placesTaken']}/{s['placesMax']}  (id {s['id']})")
 
 
