@@ -20,6 +20,14 @@ cp config.example.yaml config.yaml  # puis adapte les règles
 .venv/bin/python -m piscine_bot --planning 2026-10-21  # planning d'un jour
 ```
 
+## Gérer les règles (menu)
+
+```bash
+.venv/bin/python -m piscine_bot.gerer
+```
+
+Ou double-clic sur `Piscine.command` dans le Finder. Le menu permet de voir, ajouter (à partir des vrais noms et horaires du planning) et supprimer des règles, d'avoir un aperçu des séances qui seront réservées, de voir ses réservations HeitzFit, et d'envoyer la config sur GitHub.
+
 ## Fonctionnement
 
 - **Règles** (`config.yaml`) : par nom d'activité, salle, jours, heure exacte ou plage horaire. Le planning peut changer, le bot réserve toute séance qui correspond (ex. `salle: BALNEO` = tout ce qui se passe dans l'eau).
