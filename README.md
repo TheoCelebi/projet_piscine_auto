@@ -22,7 +22,7 @@ cp config.example.yaml config.yaml  # puis adapte les règles
 
 ## Fonctionnement
 
-- **Règles** (`config.yaml`) : par nom d'activité, salle, jours et horaires. Le planning peut changer, le bot réserve toute séance qui correspond (ex. `salle: BALNEO` = tout ce qui se passe dans l'eau).
+- **Règles** (`config.yaml`) : par nom d'activité, salle, jours, heure exacte ou plage horaire. Le planning peut changer, le bot réserve toute séance qui correspond (ex. `salle: BALNEO` = tout ce qui se passe dans l'eau).
 - **Ouverture** : les réservations ouvrent 48h avant. En mode `--surveiller`, le bot lit le planning toutes les 10 min et se cale à la seconde sur la prochaine ouverture.
 - **Séances complètes** : surveillées ; si une place se libère, le bot la prend.
 - **Mémoire** (`etat.json`, local) : ce que le bot a réservé. Si une séance réservée par le bot disparaît de « Mes réservations », c'est que tu l'as annulée : le bot ne la reprendra jamais.

@@ -10,10 +10,12 @@ detecter_annulations: true  # une séance que tu annules dans l'appli n'est plus
 #   activite : le nom contient ce texte (majuscules/accents ignorés)
 #   salle    : la salle contient ce texte
 #   jours    : liste de jours (lundi ... dimanche)
+#   heure    : heure de début exacte ("HH:MM")
 #   apres / avant : heure de début comprise entre ces bornes ("HH:MM")
 regles:
-  # Tout ce qui se passe dans l'eau (AQUABIKE, AQUARUN, AQUABOX, et les futures activités)
+  # Les séances dans l'eau (AQUABIKE, AQUARUN, AQUABOX...) qui commencent à 9h15
   - salle: BALNEO
+    heure: "09:15"
 
   # Exemple : Pilates seulement le mercredi soir
   # - activite: PILATES

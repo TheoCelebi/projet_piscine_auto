@@ -46,6 +46,8 @@ def correspond(seance, regle):
     if "jours" in regle and JOURS[seance["debut"].weekday()] not in [j.lower() for j in regle["jours"]]:
         return False
     heure = seance["debut"].strftime("%H:%M")
+    if "heure" in regle and heure != regle["heure"]:
+        return False
     if "apres" in regle and heure < regle["apres"]:
         return False
     if "avant" in regle and heure > regle["avant"]:
@@ -96,7 +98,10 @@ class Bot:
     def passage(self):
         """Réserve tout ce qui est ouvert. Renvoie les séances qui ouvriront plus tard."""
         a_venir = []
-        for s in self.cibles():
+        cibles = self.cibles()
+        if not cibles and not self.reel:
+            log(f"[simulation] aucune séance correspondant aux règles dans les {FENETRE_JOURS} prochains jours.")
+        for s in cibles:
             statut = self.etat.statut(s["id"])
             if statut in (RESERVEE, ANNULEE) or s["id"] in self.sur_compte:
                 continue
