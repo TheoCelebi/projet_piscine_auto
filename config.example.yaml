@@ -1,0 +1,14 @@
+# Copie ce fichier en config.yaml (ignoré par git) et liste tes séances.
+
+centre: 1879  # Centre Aquatique de BOIS COLOMBES
+
+seances:
+  # Une séance précise, à une date donnée
+  - activite: PILATES
+    date: 2026-10-21
+    heure: "19:00"
+
+  # Une séance récurrente, chaque semaine
+  # - activite: AQUABIKE
+  #   jour: mardi
+  #   heure: "19:15"
