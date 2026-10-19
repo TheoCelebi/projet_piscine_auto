@@ -23,6 +23,7 @@ class Heitzfit:
         self.id_centre = id_centre
         self.api = f"{BASE_URL}/c/{id_centre}/ws"
         self.timeout = timeout
+        self.client_id = None
         self.session = requests.Session()
         self.session.headers["User-Agent"] = "projet_piscine_auto (usage personnel)"
 
@@ -47,6 +48,7 @@ class Heitzfit:
         if not token:
             raise HeitzfitError("Connexion refusée : pas de jeton dans la réponse", "SESS_TOKEN_KO")
         self.session.headers["Authorization"] = token
+        self.client_id = data.get("clientId")
 
     def planning(self, jour: date, nb_jours=1):
         """Renvoie la liste des séances, avec l'heure de début en heure de Paris."""
@@ -62,6 +64,17 @@ class Heitzfit:
                 debut = datetime.fromisoformat(s["start"].replace("Z", "+00:00")).astimezone(PARIS)
                 seances.append({**s, "debut": debut})
         return sorted(seances, key=lambda s: s["debut"])
+
+    def mes_reservations(self):
+        """Ids des séances actuellement réservées sur le compte (comme « Mes réservations »)."""
+        data = self._request("GET", "/api/planning/book", params={
+            "idClient": self.client_id,
+            "viewMode": 0,
+            "include": "2,3",
+        })
+        if not isinstance(data, list):
+            raise HeitzfitError(f"Réponse inattendue pour la liste des réservations : {type(data).__name__}")
+        return {r["idPlanning"] for r in data}
 
     def reserver(self, id_seance, places=1, liste_attente=False):
         return self._request("POST", "/api/planning/book", json={

@@ -16,6 +16,8 @@ playwright/.auth/
 # --- Configuration personnelle (tes séances, ton profil) ---
 config.yaml
 config.local.*
+etat.json
+etat.json.tmp
 !config.example.yaml
 
 # --- Logs, captures, traces (peuvent contenir des données perso) ---

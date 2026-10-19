@@ -1,15 +1,24 @@
-# Copie ce fichier en config.yaml (ignoré par git) et liste tes séances.
+# Copie ce fichier en config.yaml (ignoré par git) et adapte les règles.
 
-centre: 1879  # Centre Aquatique de BOIS COLOMBES
+centre: 1879                # Centre Aquatique de BOIS COLOMBES
 ouverture_heures_avant: 48  # les réservations ouvrent 48h avant le début de la séance
+intervalle_minutes: 10      # en mode --surveiller, fréquence de lecture du planning
+detecter_annulations: true  # une séance que tu annules dans l'appli n'est plus jamais reprise
 
-seances:
-  # Une séance précise, à une date donnée
-  - activite: PILATES
-    date: 2026-10-21
-    heure: "19:00"
+# Le bot réserve toute séance qui correspond à AU MOINS UNE règle.
+# Dans une règle, tous les critères donnés doivent être vrais :
+#   activite : le nom contient ce texte (majuscules/accents ignorés)
+#   salle    : la salle contient ce texte
+#   jours    : liste de jours (lundi ... dimanche)
+#   apres / avant : heure de début comprise entre ces bornes ("HH:MM")
+regles:
+  # Tout ce qui se passe dans l'eau (AQUABIKE, AQUARUN, AQUABOX, et les futures activités)
+  - salle: BALNEO
 
-  # Une séance récurrente, chaque semaine
-  # - activite: AQUABIKE
-  #   jour: mardi
-  #   heure: "19:15"
+  # Exemple : Pilates seulement le mercredi soir
+  # - activite: PILATES
+  #   jours: [mercredi]
+  #   apres: "18:00"
+
+# Séances précises à ne jamais réserver (id affiché par le bot)
+exclure_ids: []
