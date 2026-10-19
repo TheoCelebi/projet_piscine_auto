@@ -19,6 +19,7 @@ from dotenv import load_dotenv
 
 from .etat import ANNULEE, RESERVEE, Etat
 from .heitzfit import PARIS, Heitzfit, HeitzfitError
+from .notif import notifier
 
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 FENETRE_JOURS = 3  # les réservations ouvrent 48h avant : aujourd'hui + 2 jours suffisent
@@ -65,6 +66,12 @@ def afficher(s):
             f"{s['room']:<20} {s['placesTaken']}/{s['placesMax']}  (id {s['id']})")
 
 
+def decrire(s):
+    """Détail complet pour la notification (privée, contrairement aux logs GitHub)."""
+    return (f"{s['activity']} {JOURS[s['debut'].weekday()]} {s['debut']:%d/%m à %H:%M}\n"
+            f"{s['room']} - {s['placesTaken'] + 1}/{s['placesMax']}")
+
+
 class Bot:
     def __init__(self, config, etat, reel):
         self.config = config
@@ -101,6 +108,10 @@ class Bot:
         for s in self.etat.synchroniser(self.sur_compte):
             detail = "séance" if DISCRET else f"{s['activite']} {s['debut'][:16]}"
             log(f"ANNULÉE PAR TOI (ne sera plus réservée) : {detail}")
+            debut = datetime.fromisoformat(s["debut"])
+            notifier("Annulation prise en compte",
+                     f"{s['activite']} {JOURS[debut.weekday()]} {debut:%d/%m à %H:%M}\nLe bot ne la reprendra pas.",
+                     tags=["wastebasket"])
 
     def passage(self):
         """Réserve tout ce qui est ouvert. Renvoie les séances qui ouvriront plus tard."""
@@ -135,12 +146,16 @@ class Bot:
             if self.reserver_des_ouverture(s, ouverture):
                 self.etat.marquer(s, RESERVEE)
                 log(f"RÉSERVÉ : {afficher(s)}")
+                notifier("Séance réservée", decrire(s), tags=["white_check_mark", "swimmer"])
             else:
                 self.echecs += 1
                 log(f"ÉCHEC   : {afficher(s)} -> toujours fermé après {RETENTE_MAX_S}s")
+                notifier("Réservation ratée", f"{decrire(s)}\nToujours fermée après {RETENTE_MAX_S}s.",
+                         tags=["x"], priorite=4)
         except HeitzfitError as e:
             self.echecs += 1
             log(f"ÉCHEC   : {afficher(s)} -> {e.code or e}")
+            notifier("Réservation ratée", f"{decrire(s)}\nErreur HeitzFit : {e.code or e}", tags=["x"], priorite=4)
 
     def passage_unique(self, fenetre_min):
         """Réserve ce qui est ouvert, puis attend les ouvertures des `fenetre_min` prochaines minutes."""
@@ -225,7 +240,11 @@ def main():
 
     bot = Bot(config, Etat(args.etat), reel=args.reserver or args.surveiller or args.fenetre is not None)
     if args.fenetre is not None:
-        return bot.passage_unique(args.fenetre)
+        try:
+            return bot.passage_unique(args.fenetre)
+        except Exception as e:
+            notifier("Bot piscine en erreur", f"{type(e).__name__} : {e}", tags=["warning"], priorite=4)
+            raise
     if args.surveiller:
         bot.surveiller()
     if args.reserver:

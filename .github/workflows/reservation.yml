@@ -49,6 +49,7 @@ jobs:
         env:
           HEITZFIT_EMAIL: ${{ secrets.HEITZFIT_EMAIL }}
           HEITZFIT_PASSWORD: ${{ secrets.HEITZFIT_PASSWORD }}
+          NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           PISCINE_BOT_DISCRET: "1"
           TZ: Europe/Paris
         run: python -m piscine_bot --fenetre 60
