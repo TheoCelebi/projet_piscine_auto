@@ -17,7 +17,7 @@ from datetime import date, datetime, timedelta
 import yaml
 from dotenv import load_dotenv
 
-from .etat import ANNULEE, RESERVEE, Etat
+from .etat import ANNULEE, COMPLETE, RESERVEE, Etat
 from .heitzfit import PARIS, Heitzfit, HeitzfitError
 from .notif import notifier
 
@@ -27,6 +27,11 @@ AVANCE_CONNEXION_S = 60  # connexion 1 min avant l'ouverture
 RETENTE_MAX_S = 180  # on réessaie pendant 3 min si HeitzFit n'a pas encore ouvert
 # Codes HeitzFit renvoyés quand la séance est hors de la période de réservation.
 PAS_ENCORE_OUVERT = {"PERIOD_EXCEEDED", "PERIOD_NOT_STARTED"}
+EXPLICATIONS = {
+    "MAX_LIMIT": "Limite de réservations de ton abonnement atteinte (trop de séances déjà réservées).",
+    "MAX_DAILY_LIMIT": "Limite de réservations par jour de ton abonnement atteinte.",
+    "NO_ACTIVE_ACCESS": "Pas d'abonnement actif pour cette activité.",
+}
 # Sur GitHub Actions (dépôt public, logs visibles par tous), on ne dévoile pas tes horaires.
 DISCRET = os.getenv("PISCINE_BOT_DISCRET") == "1"
 
@@ -66,10 +71,10 @@ def afficher(s):
             f"{s['room']:<20} {s['placesTaken']}/{s['placesMax']}  (id {s['id']})")
 
 
-def decrire(s):
+def decrire(s, prise=True):
     """Détail complet pour la notification (privée, contrairement aux logs GitHub)."""
     return (f"{s['activity']} {JOURS[s['debut'].weekday()]} {s['debut']:%d/%m à %H:%M}\n"
-            f"{s['room']} - {s['placesTaken'] + 1}/{s['placesMax']}")
+            f"{s['room']} - {s['placesTaken'] + prise}/{s['placesMax']}")
 
 
 class Bot:
@@ -131,6 +136,11 @@ class Bot:
                 # Complète : on retentera au prochain passage, une place peut se libérer.
                 if not self.reel:
                     log(f"[simulation] complète, surveillée : {afficher(s)}")
+                elif statut != COMPLETE:
+                    self.etat.marquer(s, COMPLETE)
+                    log(f"COMPLÈTE : {afficher(s)} (surveillée)")
+                    notifier("Séance complète", f"{decrire(s, prise=False)}\nLe bot prendra une place si elle se libère.",
+                             tags=["hourglass"])
                 continue
             if not self.reel:
                 log(f"[simulation] réserverait : {afficher(s)}")
@@ -148,14 +158,22 @@ class Bot:
                 log(f"RÉSERVÉ : {afficher(s)}")
                 notifier("Séance réservée", decrire(s), tags=["white_check_mark", "swimmer"])
             else:
-                self.echecs += 1
-                log(f"ÉCHEC   : {afficher(s)} -> toujours fermé après {RETENTE_MAX_S}s")
-                notifier("Réservation ratée", f"{decrire(s)}\nToujours fermée après {RETENTE_MAX_S}s.",
-                         tags=["x"], priorite=4)
+                self.echec(s, "FERMEE", f"Toujours fermée après {RETENTE_MAX_S}s.")
         except HeitzfitError as e:
-            self.echecs += 1
-            log(f"ÉCHEC   : {afficher(s)} -> {e.code or e}")
-            notifier("Réservation ratée", f"{decrire(s)}\nErreur HeitzFit : {e.code or e}", tags=["x"], priorite=4)
+            code = e.code or "ERREUR"
+            explication = EXPLICATIONS.get(code, f"Erreur HeitzFit : {e.code or e}")
+            self.echec(s, code, explication)
+
+    def echec(self, s, code, explication):
+        """Le bot retentera au passage suivant, mais ne prévient qu'une fois par séance et par erreur."""
+        log(f"ÉCHEC   : {afficher(s)} -> {code}")
+        statut = f"echec:{code}"
+        if self.etat.statut(s["id"]) == statut:
+            return
+        self.echecs += 1
+        self.etat.marquer(s, statut)
+        notifier("Réservation ratée", f"{decrire(s, prise=False)}\n{explication}\nLe bot réessaiera chaque heure.",
+                 tags=["x"], priorite=4)
 
     def passage_unique(self, fenetre_min):
         """Réserve ce qui est ouvert, puis attend les ouvertures des `fenetre_min` prochaines minutes."""

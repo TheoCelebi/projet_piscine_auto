@@ -8,6 +8,7 @@ from .heitzfit import PARIS
 
 RESERVEE = "reservee"
 ANNULEE = "annulee_par_toi"  # le bot ne la réservera plus jamais
+COMPLETE = "complete"  # déjà signalée comme complète ; le bot guette encore un désistement
 
 
 class Etat:

@@ -38,7 +38,7 @@ Ou double-clic sur `Piscine.command` dans le Finder. Le menu permet de voir, ajo
 
 ## Exécution automatique (GitHub Actions)
 
-Le workflow `reservation.yml` tourne chaque matin (passages horaires de 8h40 à 11h40, heure de Paris), attend les ouvertures visées (9h15, 11h15) et réserve, puis s’arrête : rien ne tourne chez soi.
+Le workflow `reservation.yml` est déclenché chaque heure à HH:05 (heure de Paris) par cron-job.org via l’API GitHub (workflow_dispatch), avec un cron GitHub horaire en secours. Le passage de 9h05 attend les ouvertures de 9h15 et réserve à la seconde ; les autres reprennent les places libérées. Chaque passage s’arrête aussitôt : rien ne tourne chez soi.
 
 Secrets à définir dans le dépôt (Settings → Secrets and variables → Actions) :
 
