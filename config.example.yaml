@@ -25,3 +25,8 @@ regles:
 
 # Séances précises à ne jamais réserver (id affiché par le bot)
 exclure_ids: []
+
+# Vacances : rien n'est réservé entre ces dates (incluses). Aussi réglable depuis Telegram.
+pauses: []
+#  - du: "2026-12-20"
+#    au: "2027-01-03"

@@ -44,10 +44,31 @@ Secrets à définir dans le dépôt (Settings → Secrets and variables → Acti
 
 - `HEITZFIT_EMAIL`, `HEITZFIT_PASSWORD` : identifiants HeitzFit
 - `HEITZFIT_CONFIG` : contenu de `config.yaml` (gardé secret pour ne pas publier ses horaires)
+- `NTFY_TOPIC` : notifications de l'administrateur ; les autres canaux sont décrits plus haut
 
 Les logs étant publics, le bot y masque le détail des séances. La mémoire (`etat.json`) est conservée d'un passage à l'autre dans le cache GitHub Actions. En cas d'échec, GitHub envoie un email.
 
 Le bot appelle directement l'API de app.heitzfit.com (centre 1879, Bois-Colombes).
+
+## Pour la personne qui va à la piscine
+
+Elle n'a besoin ni du terminal ni de GitHub : tout passe par son téléphone (voir [GUIDE.md](GUIDE.md), à lui donner).
+
+- **Notifications simples** (sans jargon) : séance réservée, place récupérée, annulation prise en compte, limite de l'abonnement atteinte. Boutons « Ouvrir HeitzFit » et « Ajouter à l'agenda ».
+- **Rappel la veille** vers 19h et **récapitulatif de la semaine** le dimanche soir.
+- **La nuit** (0h-7h), le bot réserve quand même mais les messages arrivent à 8h15 (ntfy) ou sans sonnerie (Telegram).
+- **Bot Telegram privé** (facultatif) : boutons « Mes séances », « Ma semaine », « Pause » (vacances), « Mes cours » (activer / désactiver un cours). Il ne répond qu'à sa conversation. Les messages sont lus à chaque passage du bot (environ une fois par heure).
+- Les détails techniques (erreurs, séances complètes) ne vont qu'à l'administrateur (`NTFY_TOPIC`), qui reçoit aussi une copie des réservations.
+
+Canaux (secrets GitHub, tous facultatifs) :
+
+| Secret | Rôle |
+|---|---|
+| `NTFY_TOPIC_MERE` | son sujet ntfy (appli ntfy sur son téléphone) |
+| `NTFY_EMAIL_MERE` | copie des notifications par email (envoyée via ntfy.sh) |
+| `TELEGRAM_TOKEN`, `TELEGRAM_CHAT_ID` | bot Telegram : jeton donné par @BotFather, puis `python -m piscine_bot.telegram` pour trouver l'identifiant de sa conversation |
+
+Les pauses de vacances se règlent aussi dans le menu (`Pauses (vacances)`), ou dans `config.yaml` (`pauses:`).
 
 ## Sécurité
 

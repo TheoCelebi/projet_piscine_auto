@@ -4,9 +4,10 @@
 """
 
 import os
+import re
 import subprocess
 import sys
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 
 import yaml
 from dotenv import load_dotenv
@@ -156,10 +157,53 @@ def apercu(config):
             ouverture = s["debut"] - delai
             quand = "déjà ouverte" if ouverture <= maintenant else \
                 f"réservée le {JOURS[ouverture.weekday()]} {ouverture:%d/%m à %H:%M}"
+            if any(str(p["du"]) <= s["debut"].date().isoformat() <= str(p["au"]) for p in config.get("pauses") or []):
+                quand = "en pause (vacances)"
             print(f"  {afficher(s)}  -> {quand}")
             trouve = True
     if not trouve:
         print("  (aucune pour l'instant ; la piscine publie ses séances au fur et à mesure)")
+
+
+def lire_date(texte):
+    """« 20/12/2026 » ou « 2026-12-20 » -> date, sinon None."""
+    texte = texte.strip()
+    try:
+        if re.fullmatch(r"\d{4}-\d{2}-\d{2}", texte):
+            return date.fromisoformat(texte)
+        j, m, a = re.fullmatch(r"(\d{1,2})/(\d{1,2})/(\d{2,4})", texte).groups()
+        return date(int(a) + (2000 if len(a) == 2 else 0), int(m), int(j))
+    except (AttributeError, ValueError):
+        return None
+
+
+def gerer_pauses(config):
+    """Vacances : le bot ne réserve rien entre deux dates (incluses)."""
+    pauses = config.setdefault("pauses", [])
+    print("\nPauses (vacances) :")
+    if not pauses:
+        print("  (aucune)")
+    for i, p in enumerate(pauses, 1):
+        print(f"  {i}. du {p['du']} au {p['au']}")
+    print("  (les pauses réglées depuis Telegram sont gardées à part, dans la mémoire du bot)")
+    choix = choisir("Que faire ?", ["Ajouter une pause", "Supprimer une pause"], aucun="Retour")
+    if choix == "Ajouter une pause":
+        du = lire_date(demander("Premier jour (JJ/MM/AAAA)"))
+        au = lire_date(demander("Dernier jour (JJ/MM/AAAA)"))
+        if not du or not au or au < du:
+            print("  Dates invalides.")
+            return False
+        pauses.append({"du": du.isoformat(), "au": au.isoformat()})
+    elif choix == "Supprimer une pause" and pauses:
+        p = choisir("Laquelle ?", [f"du {p['du']} au {p['au']}" for p in pauses], aucun="Annuler")
+        if p is None:
+            return False
+        del pauses[[f"du {x['du']} au {x['au']}" for x in pauses].index(p)]
+    else:
+        return False
+    sauver(config)
+    print("Pauses mises à jour.")
+    return True
 
 
 def mes_reservations(config):
@@ -198,6 +242,7 @@ def main():
         "Supprimer une règle",
         "Aperçu : séances qui seront réservées",
         "Mes réservations actuelles (HeitzFit)",
+        "Pauses (vacances)",
         "Envoyer la config sur GitHub",
     ]
     print("=== Bot piscine : gestion des règles ===")
@@ -223,6 +268,8 @@ def main():
             elif choix == actions[4]:
                 mes_reservations(config)
             elif choix == actions[5]:
+                non_publie |= gerer_pauses(config)
+            elif choix == actions[6]:
                 if publier():
                     non_publie = False
         except (HeitzfitError, OSError) as e:

@@ -50,6 +50,11 @@ jobs:
           HEITZFIT_EMAIL: ${{ secrets.HEITZFIT_EMAIL }}
           HEITZFIT_PASSWORD: ${{ secrets.HEITZFIT_PASSWORD }}
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
+          # Facultatifs : notifications pour la personne qui va à la piscine
+          NTFY_TOPIC_MERE: ${{ secrets.NTFY_TOPIC_MERE }}
+          NTFY_EMAIL_MERE: ${{ secrets.NTFY_EMAIL_MERE }}
+          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
           PISCINE_BOT_DISCRET: "1"
           TZ: Europe/Paris
         run: python -m piscine_bot --fenetre 90

@@ -18,6 +18,8 @@ class Etat:
         if os.path.exists(chemin):
             with open(chemin, encoding="utf-8") as f:
                 self.seances = json.load(f)
+        # Réglages faits depuis Telegram, rappels déjà envoyés, etc.
+        self.extra = self.seances.pop("_extra", {})
 
     def statut(self, id_seance):
         return self.seances.get(str(id_seance), {}).get("statut")
@@ -50,5 +52,5 @@ class Etat:
     def sauver(self):
         tmp = self.chemin + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(self.seances, f, ensure_ascii=False, indent=2)
+            json.dump({**self.seances, "_extra": self.extra}, f, ensure_ascii=False, indent=2)
         os.replace(tmp, self.chemin)

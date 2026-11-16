@@ -19,7 +19,10 @@ from dotenv import load_dotenv
 
 from .etat import ANNULEE, COMPLETE, RESERVEE, Etat
 from .heitzfit import PARIS, Heitzfit, HeitzfitError
-from .notif import notifier
+from . import famille as fam
+from .notif import admin
+from .notif import famille as prevenir
+from .textes import nom, quand, salle
 
 JOURS = ["lundi", "mardi", "mercredi", "jeudi", "vendredi", "samedi", "dimanche"]
 FENETRE_JOURS = 3  # les réservations ouvrent 48h avant : aujourd'hui + 2 jours suffisent
@@ -27,6 +30,11 @@ AVANCE_CONNEXION_S = 60  # connexion 1 min avant l'ouverture
 RETENTE_MAX_S = 180  # on réessaie pendant 3 min si HeitzFit n'a pas encore ouvert
 # Codes HeitzFit renvoyés quand la séance est hors de la période de réservation.
 PAS_ENCORE_OUVERT = {"PERIOD_EXCEEDED", "PERIOD_NOT_STARTED"}
+# Erreurs que la personne qui va à la piscine peut régler elle-même : on la prévient aussi.
+POUR_ELLE = {
+    "MAX_LIMIT": "Tu as déjà le nombre maximum de séances réservées autorisé par ton abonnement.",
+    "MAX_DAILY_LIMIT": "Tu as déjà le nombre maximum de séances autorisé ce jour-là par ton abonnement.",
+}
 EXPLICATIONS = {
     "MAX_LIMIT": "Limite de réservations de ton abonnement atteinte (trop de séances déjà réservées).",
     "MAX_DAILY_LIMIT": "Limite de réservations par jour de ton abonnement atteinte.",
@@ -97,13 +105,28 @@ class Bot:
         self.hf.connexion(email, mdp)
         self.connecte_a = time.monotonic()
 
+    def voulue(self, s, ignorer_pause=False, ignorer_exclusions=False):
+        """La séance correspond aux règles, hors pauses (vacances) et cours désactivés."""
+        if s["deleted"] or s["id"] in self.exclues or not any(correspond(s, r) for r in self.config["regles"]):
+            return False
+        if not ignorer_exclusions and fam.activite_exclue(s, self.etat):
+            return False
+        if not ignorer_pause and fam.en_pause(s["debut"].date(), self.config, self.etat):
+            return False
+        return True
+
     def cibles(self):
         maintenant = datetime.now(PARIS)
         seances = self.hf.planning(maintenant.date(), FENETRE_JOURS)
-        return [s for s in seances
-                if s["debut"] > maintenant and not s["deleted"]
-                and s["id"] not in self.exclues
-                and any(correspond(s, r) for r in self.config["regles"])]
+        return [s for s in seances if s["debut"] > maintenant and self.voulue(s)]
+
+    def pour_elle(self):
+        """Telegram et rappels : jamais bloquants pour les réservations."""
+        for etape in (fam.traiter_messages, lambda bot, log: fam.rappels(bot)):
+            try:
+                etape(self, log)
+            except Exception as e:  # noqa: BLE001
+                log(f"Messages / rappels : erreur ignorée ({type(e).__name__})")
 
     def synchroniser(self):
         """Détecte les séances réservées par le bot que tu as annulées depuis l'appli."""
@@ -114,8 +137,8 @@ class Bot:
             detail = "séance" if DISCRET else f"{s['activite']} {s['debut'][:16]}"
             log(f"ANNULÉE PAR TOI (ne sera plus réservée) : {detail}")
             debut = datetime.fromisoformat(s["debut"])
-            notifier("Annulation prise en compte",
-                     f"{s['activite']} {JOURS[debut.weekday()]} {debut:%d/%m à %H:%M}\nLe bot ne la reprendra pas.",
+            prevenir("Annulation bien prise en compte",
+                     f"{str(s['activite']).capitalize()}, {quand(debut)}.\nJe ne la réserverai plus.",
                      tags=["wastebasket"])
 
     def passage(self):
@@ -139,7 +162,7 @@ class Bot:
                 elif statut != COMPLETE:
                     self.etat.marquer(s, COMPLETE)
                     log(f"COMPLÈTE : {afficher(s)} (surveillée)")
-                    notifier("Séance complète", f"{decrire(s, prise=False)}\nLe bot prendra une place si elle se libère.",
+                    admin("Séance complète", f"{decrire(s, prise=False)}\nLe bot prendra une place si elle se libère.",
                              tags=["hourglass"])
                 continue
             if not self.reel:
@@ -153,10 +176,17 @@ class Bot:
 
     def tenter(self, s, ouverture):
         try:
+            recuperee = self.etat.statut(s["id"]) == COMPLETE
             if self.reserver_des_ouverture(s, ouverture):
                 self.etat.marquer(s, RESERVEE)
                 log(f"RÉSERVÉ : {afficher(s)}")
-                notifier("Séance réservée", decrire(s), tags=["white_check_mark", "swimmer"])
+                detail = f"{nom(s)}, {quand(s['debut'])}\n{salle(s).capitalize()}."
+                if recuperee:
+                    titre, detail = "Place récupérée 🎉", "Une place s'est libérée et je l'ai prise :\n" + detail
+                else:
+                    titre = "Séance réservée ✅"
+                prevenir(titre, detail + "\n\nSi tu ne peux pas y aller, annule dans l'appli HeitzFit : "
+                         "je ne la reprendrai pas.", tags=["swimmer"], seance=s)
             else:
                 self.echec(s, "FERMEE", f"Toujours fermée après {RETENTE_MAX_S}s.")
         except HeitzfitError as e:
@@ -172,13 +202,17 @@ class Bot:
             return
         self.echecs += 1
         self.etat.marquer(s, statut)
-        notifier("Réservation ratée", f"{decrire(s, prise=False)}\n{explication}\nLe bot réessaiera chaque heure.",
+        if code in POUR_ELLE:
+            prevenir("Séance pas réservée", f"{nom(s)}, {quand(s['debut'])}\n{POUR_ELLE[code]}\n"
+                     "Si tu en annules une, je réessaierai chaque heure.", tags=["x"], copie_admin=False)
+        admin("Réservation ratée", f"{decrire(s, prise=False)}\n{explication}\nLe bot réessaiera chaque heure.",
                  tags=["x"], priorite=4)
 
     def passage_unique(self, fenetre_min):
         """Réserve ce qui est ouvert, puis attend les ouvertures des `fenetre_min` prochaines minutes."""
         self.connexion()
         self.synchroniser()
+        self.pour_elle()
         limite = datetime.now(PARIS) + timedelta(minutes=fenetre_min)
         a_venir = sorted((x for x in self.passage() if x[0] <= limite), key=lambda x: x[0])
         if not a_venir:
@@ -216,6 +250,7 @@ class Bot:
                 if self.connecte_a is None or time.monotonic() - self.connecte_a > 1800:
                     self.connexion()
                 self.synchroniser()
+                self.pour_elle()
                 a_venir = self.passage()
                 prochaine = min((o for o, _ in a_venir), default=None)
                 attente = intervalle
@@ -261,7 +296,7 @@ def main():
         try:
             return bot.passage_unique(args.fenetre)
         except Exception as e:
-            notifier("Bot piscine en erreur", f"{type(e).__name__} : {e}", tags=["warning"], priorite=4)
+            admin("Bot piscine en erreur", f"{type(e).__name__} : {e}", tags=["warning"], priorite=4)
             raise
     if args.surveiller:
         bot.surveiller()
