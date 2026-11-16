@@ -52,7 +52,7 @@ jobs:
           NTFY_TOPIC: ${{ secrets.NTFY_TOPIC }}
           PISCINE_BOT_DISCRET: "1"
           TZ: Europe/Paris
-        run: python -m piscine_bot --fenetre 60
+        run: python -m piscine_bot --fenetre 90
 
       - name: Sauvegarder la mémoire du bot
         if: always()
