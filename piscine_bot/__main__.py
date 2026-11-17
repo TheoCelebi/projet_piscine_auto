@@ -133,7 +133,18 @@ class Bot:
         self.sur_compte = self.hf.mes_reservations()
         if not self.config.get("detecter_annulations", False):
             return
-        for s in self.etat.synchroniser(self.sur_compte):
+        aujourdhui = datetime.now(PARIS).date()
+        existantes = {s["id"] for s in self.hf.planning(aujourdhui, 8) if not s["deleted"]}
+        annulees, supprimees = self.etat.synchroniser(self.sur_compte, existantes, aujourdhui + timedelta(days=8))
+        for s in supprimees:
+            # La piscine remplace parfois une séance par une nouvelle : le bot réserve la nouvelle,
+            # sans faire croire à une annulation.
+            detail = "séance" if DISCRET else f"{s['activite']} {s['debut'][:16]}"
+            log(f"SUPPRIMÉE PAR LA PISCINE : {detail} (une séance qui la remplace sera réservée)")
+            admin("Séance retirée par la piscine",
+                  f"{s['activite']} {s['debut'][:16]} n'existe plus au planning : la réservation a disparu "
+                  "avec elle. Si la piscine l'a recréée, le bot réserve la nouvelle.", tags=["information_source"])
+        for s in annulees:
             detail = "séance" if DISCRET else f"{s['activite']} {s['debut'][:16]}"
             log(f"ANNULÉE PAR TOI (ne sera plus réservée) : {detail}")
             debut = datetime.fromisoformat(s["debut"])

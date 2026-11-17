@@ -9,6 +9,7 @@ from .heitzfit import PARIS
 RESERVEE = "reservee"
 ANNULEE = "annulee_par_toi"  # le bot ne la réservera plus jamais
 COMPLETE = "complete"  # déjà signalée comme complète ; le bot guette encore un désistement
+SUPPRIMEE = "supprimee_par_la_piscine"  # la piscine a retiré la séance (souvent pour la recréer)
 
 
 class Etat:
@@ -33,21 +34,26 @@ class Etat:
         }
         self.sauver()
 
-    def synchroniser(self, ids_reservees_sur_compte):
-        """Une séance réservée par le bot qui n'est plus sur le compte a été annulée par toi."""
+    def synchroniser(self, ids_reservees_sur_compte, existantes=None, horizon=None):
+        """Une séance réservée par le bot qui n'est plus sur le compte a été annulée par toi...
+        sauf si la séance n'existe plus au planning (`existantes`, connu jusqu'à `horizon`) :
+        c'est alors la piscine qui l'a supprimée, et ce n'est pas une annulation de ta part.
+        Renvoie (annulées par toi, supprimées par la piscine)."""
         maintenant = datetime.now(PARIS)
-        annulees = []
+        annulees, supprimees = [], []
         for id_seance, s in self.seances.items():
             # Délai de grâce : une réservation toute fraîche peut ne pas encore apparaître.
             recente = maintenant - datetime.fromisoformat(s["maj"]) < timedelta(minutes=5)
             if (s["statut"] == RESERVEE and not recente and int(id_seance) not in ids_reservees_sur_compte
                     and datetime.fromisoformat(s["debut"]) > maintenant):
-                s["statut"] = ANNULEE
+                debut = datetime.fromisoformat(s["debut"])
+                retiree = existantes is not None and debut.date() < horizon and int(id_seance) not in existantes
+                s["statut"] = SUPPRIMEE if retiree else ANNULEE
                 s["maj"] = maintenant.isoformat(timespec="seconds")
-                annulees.append(s)
-        if annulees:
+                (supprimees if retiree else annulees).append(s)
+        if annulees or supprimees:
             self.sauver()
-        return annulees
+        return annulees, supprimees
 
     def sauver(self):
         tmp = self.chemin + ".tmp"
