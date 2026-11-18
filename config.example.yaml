@@ -26,6 +26,10 @@ regles:
 # Séances précises à ne jamais réserver (id affiché par le bot)
 exclure_ids: []
 
+# Réservations perdues sans les avoir annulées (incident côté piscine) : le bot les reprend
+# s'il reste une place, ou guette un désistement. Pris en compte une seule fois par id.
+reprendre_ids: []
+
 # Vacances : rien n'est réservé entre ces dates (incluses). Aussi réglable depuis Telegram.
 pauses: []
 #  - du: "2026-12-20"

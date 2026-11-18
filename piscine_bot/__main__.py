@@ -131,6 +131,7 @@ class Bot:
     def synchroniser(self):
         """Détecte les séances réservées par le bot que tu as annulées depuis l'appli."""
         self.sur_compte = self.hf.mes_reservations()
+        self.reprendre()
         if not self.config.get("detecter_annulations", False):
             return
         aujourdhui = datetime.now(PARIS).date()
@@ -151,6 +152,21 @@ class Bot:
             prevenir("Annulation bien prise en compte",
                      f"{str(s['activite']).capitalize()}, {quand(debut)}.\nJe ne la réserverai plus.",
                      tags=["wastebasket"])
+
+    def reprendre(self):
+        """`reprendre_ids` : réservations perdues sans que tu les aies annulées (incident HeitzFit...).
+        Le bot les oublie une fois, puis les traite comme neuves : il les reprend s'il reste
+        une place, ou guette un désistement. Une seule fois par id, pour ne jamais aller
+        contre une vraie annulation faite plus tard."""
+        repris = self.etat.extra.setdefault("repris", [])
+        for i in self.config.get("reprendre_ids") or []:
+            if str(i) in repris:
+                continue
+            repris.append(str(i))
+            if int(i) not in self.sur_compte:
+                self.etat.seances.pop(str(i), None)
+            log("Séance à reprendre : remise en surveillance.")
+        self.etat.sauver()
 
     def passage(self):
         """Réserve tout ce qui est ouvert. Renvoie les séances qui ouvriront plus tard."""
